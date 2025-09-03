@@ -1,0 +1,66 @@
+name: Deploy Client (tuffersbd.com)
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "client/**"
+      - ".github/workflows/client-deploy.yml"
+
+
+
+jobs:
+  build-and-deploy-client:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    env:
+      REMOTE_PUBLIC_HTML: public_html/
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (client)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install deps (client)
+        run: |
+          cd client
+          if [ -f package-lock.json ]; then npm ci; else npm i; fi
+
+      - name: Build (client)
+        run: |
+          cd client
+          npm run build  # must output to client/dist
+
+      - name: Upload artifact (client-dist)
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-dist
+          path: client/dist
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Deploy to cPanel (SFTP)
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.SFTP_HOST }}
+          username: ${{ secrets.SFTP_USER }}
+          password: ${{ secrets.SFTP_PASSWORD }}
+          protocol: sftp
+          port: 22
+          local-dir: client/dist
+          server-dir: ${{ env.REMOTE_PUBLIC_HTML }}
+        
+          exclude: |
+            **/.git*
+            **/.DS_Store
+            .well-known/**
+            cgi-bin/**
+            .htaccess
