@@ -1,55 +1,86 @@
-name: Deploy Server (server.tuffersbd.com)
+name: Deploy Backend Server (server.tuffersbd.com)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
     paths:
       - "server/**"
+      - ".github/workflows/server-deploy.yml"
 
 jobs:
-  deploy-server:
+  build-and-deploy-server:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Setup Node
+    steps:
+      # 1️⃣ Checkout repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2️⃣ Setup Node.js with caching
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: npm
           cache-dependency-path: server/package-lock.json
 
-      - name: Install dependencies
+      # 3️⃣ Install dependencies
+      - name: Install Dependencies
         working-directory: server
         run: |
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
 
-      - name: Upload artifact
+      # 4️⃣ Upload server folder as artifact for debugging / future reuse
+      - name: Upload Server Artifact
         uses: actions/upload-artifact@v4
         with:
           name: server-artifact
-          path: server/**
-          retention-days: 3
+          path: |
+            server/**
+            !server/node_modules/**
+            !server/test/**
+            !server/tests/**
+            !server/coverage/**
+            !server/.env.local
+            !server/.vscode/**
+          retention-days: 7
 
-      - name: Deploy via SFTP (auto-create folder)
-        uses: wlixcc/SFTP-Deploy-Action@v1.2
+      # 5️⃣ Deploy server folder via FTP
+      - name: Deploy to cPanel via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
-          host: ${{ secrets.SFTP_HOST }}
+          server: ${{ secrets.SERVER_HOST }}           # ex: 198.187.29.8
+          username: ${{ secrets.SERVER_USER }}        # cPanel FTP username
+          password: ${{ secrets.SFTP_PASSWORD }}      # cPanel FTP password
+          protocol: ftps                               # SamKirkland action supports ftp / ftps / ftps-legacy
           port: 21
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SFTP_PASSWORD }}
-          local_path: server/*
-          server-dir: ./server.tuffersbd.com/  # Added ./ prefix
-          args: "-o StrictHostKeyChecking=no"
+          local-dir: server/                           # local folder containing backend files
+          server-dir: server.tuffersbd.com/            # remote folder on cPanel
+          dangerous-clean-slate: true                 # optional: remove existing files first
+          exclude: |
+            **/.git*
+            **/.DS_Store
+            server/node_modules/**
+            server/test/**
+            server/tests/**
+            server/coverage/**
+            server/.env.local
+            server/.vscode/**
+            server/*.md
 
+      # 6️⃣ Restart Node.js App on cPanel via SSH
       - name: Restart Node.js App (SSH)
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SFTP_PASSWORD }}
-          port: 21098
+          port: 21098                              # আপনার cPanel SSH port
           script: |
             cd ~/server.tuffersbd.com
-            npm install
+            npm install --production
             mkdir -p tmp && touch tmp/restart.txt
