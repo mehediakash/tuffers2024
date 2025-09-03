@@ -39,7 +39,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SFTP_PASSWORD }}
           local_path: server/*
-          remote_path: server.tuffersbd.com/
+          server-dir: ./server.tuffersbd.com/  # Added ./ prefix
           args: "-o StrictHostKeyChecking=no"
 
       - name: Restart Node.js App (SSH)
