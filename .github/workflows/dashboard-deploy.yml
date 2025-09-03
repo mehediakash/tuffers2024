@@ -54,7 +54,7 @@ jobs:
           password: ${{ secrets.SFTP_PASSWORD }}
           protocol: ftps
           port: 21
-          local-dir: dashboard/dist
+          local-dir: dashboard/dist/
           dangerous-clean-slate: true
           exclude: |
             **/.git*
