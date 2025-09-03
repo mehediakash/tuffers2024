@@ -10,21 +10,28 @@ on:
 jobs:
   deploy-server:
     runs-on: ubuntu-latest
+
     steps:
+      # 1️⃣ Checkout repo
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 2️⃣ Setup Node.js + cache
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "20.19.3"
+          cache: npm
+          cache-dependency-path: server/package-lock.json
 
-      - name: Install dependencies (just to verify lockfile)
+      # 3️⃣ Install dependencies
+      - name: Install dependencies
+        working-directory: server
         run: |
-          cd server
           if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-      - name: Deploy to cPanel via SFTP
+      # 4️⃣ Deploy server via FTPS
+      - name: Deploy to cPanel via FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
           server: ${{ secrets.SFTP_HOST }}
@@ -32,8 +39,7 @@ jobs:
           password: ${{ secrets.SFTP_PASSWORD }}
           protocol: ftps
           port: 21
-          local-dir: server/
-          server-dir: server.tuffersbd.com/
+          local-dir: server/           # <-- must end with /
           dangerous-clean-slate: true
           exclude: |
             **/.git*
@@ -46,6 +52,7 @@ jobs:
             server/.vscode/**
             server/*.md
 
+      # 5️⃣ Restart Node.js App on cPanel via SSH
       - name: Restart Node.js App (SSH)
         uses: appleboy/ssh-action@v0.1.7
         with:
@@ -55,5 +62,5 @@ jobs:
           port: 21098
           script: |
             cd ~/server.tuffersbd.com
-            npm install
-            touch tmp/restart.txt || mkdir -p tmp && touch tmp/restart.txt
+            npm install       # installs dev dependencies too (for development mode)
+            mkdir -p tmp && touch tmp/restart.txt
