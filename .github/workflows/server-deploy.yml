@@ -8,7 +8,7 @@ on:
       - ".github/workflows/server-deploy.yml"
 
 jobs:
-  deploy-server:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,7 +20,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20.19.3"
+          node-version: "20"
           cache: npm
           cache-dependency-path: server/package-lock.json
 
@@ -30,7 +30,22 @@ jobs:
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-      # 4️⃣ Deploy server via FTPS
+      # 4️⃣ Upload server folder as artifact (for reuse/debug)
+      - name: Upload server artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-artifact
+          path: |
+            server/**
+            !server/node_modules/**
+            !server/test/**
+            !server/tests/**
+            !server/coverage/**
+            !server/.env.local
+            !server/.vscode/**
+          retention-days: 3
+
+      # 5️⃣ Deploy server via FTPS
       - name: Deploy to cPanel via FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
@@ -39,7 +54,7 @@ jobs:
           password: ${{ secrets.SFTP_PASSWORD }}
           protocol: ftps
           port: 21
-          local-dir: server/           # <-- must end with /
+          local-dir: server/
           dangerous-clean-slate: true
           exclude: |
             **/.git*
@@ -52,7 +67,7 @@ jobs:
             server/.vscode/**
             server/*.md
 
-      # 5️⃣ Restart Node.js App on cPanel via SSH
+      # 6️⃣ Restart Node.js App on cPanel via SSH
       - name: Restart Node.js App (SSH)
         uses: appleboy/ssh-action@v0.1.7
         with:
@@ -62,5 +77,5 @@ jobs:
           port: 21098
           script: |
             cd ~/server.tuffersbd.com
-            npm install       # installs dev dependencies too (for development mode)
+            npm install
             mkdir -p tmp && touch tmp/restart.txt
