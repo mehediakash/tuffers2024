@@ -1,8 +1,8 @@
-name: Deploy Backend Server (server.tuffersbd.com)
+name: 🚀 Deploy Backend Server (server.tuffersbd.com)
 
 on:
   push:
-    branches: ["main"]
+    branches: [ "main" ]
     paths:
       - "server/**"
       - ".github/workflows/server-deploy.yml"
@@ -13,11 +13,11 @@ jobs:
 
     steps:
       # 1️⃣ Checkout code
-      - name: Checkout repository
+      - name: ⬇️ Checkout repository
         uses: actions/checkout@v4
 
       # 2️⃣ Setup Node.js + caching
-      - name: Setup Node.js
+      - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -25,7 +25,7 @@ jobs:
           cache-dependency-path: server/package-lock.json
 
       # 3️⃣ Install dependencies
-      - name: Install Dependencies
+      - name: 📦 Install Dependencies
         working-directory: server
         run: |
           if [ -f package-lock.json ]; then
@@ -34,48 +34,31 @@ jobs:
             npm install
           fi
 
-      # 4️⃣ Optional: List local files (debug)
-      - name: List server folder
+      # 4️⃣ Optional: Debug - list server files
+      - name: 🔍 List server folder
+        run: ls -la server/
+
+      # 5️⃣ Build server (if you have build step, else skip)
+      - name: 🛠️ Build server
+        working-directory: server
         run: |
-          ls -la server/
+          if [ -f package.json ] && grep -q '"build"' package.json; then
+            npm run build
+          else
+            echo "⚠️ No build step found, skipping..."
+          fi
 
-      # 5️⃣ Upload server folder as artifact
-      - name: Upload server artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: server-artifact
-          path: |
-            server/**
-            !server/node_modules/**
-            !server/test/**
-            !server/tests/**
-            !server/coverage/**
-            !server/.env.local
-            !server/.vscode/**
-          retention-days: 7
-
-      # 6️⃣ Ensure remote folder exists (avoid 553)
-      - name: Create remote folder via SSH
-        uses: appleboy/ssh-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SFTP_PASSWORD }}
-          port: 21098
-          script: |
-            mkdir -p ~/server.tuffersbd.com
-
-      # 7️⃣ Deploy server via FTP
-      - name: Deploy server to cPanel via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      # 6️⃣ Upload dist folder via FTP
+      - name: 📂 Upload backend `server/` via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SFTP_PASSWORD }}
           protocol: ftp
           port: 21
-          local-dir: server/                        # local folder
-          server-dir: server.tuffersbd.com/         # remote folder
+          local-dir: server/                       # adjust if you build into dist/
+          server-dir: /server.tuffersbd.com/
           dangerous-clean-slate: true
           exclude: |
             **/.git*
@@ -88,15 +71,21 @@ jobs:
             server/.vscode/**
             server/*.md
 
-      # 8️⃣ Restart Node.js App via SSH
-      - name: Restart Node.js App
-        uses: appleboy/ssh-action@v0.1.7
+      # 7️⃣ Prepare restart trigger file
+      - name: 🧼 Prepare tmp directory with fresh restart.txt
+        working-directory: server
+        run: |
+          mkdir -p tmp
+          date > tmp/restart.txt
+
+      # 8️⃣ Upload restart.txt via FTP
+      - name: 📂 Restart trigger via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          host: ${{ secrets.SERVER_HOST }}
+          server: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SFTP_PASSWORD }}
-          port: 21098
-          script: |
-            cd ~/server.tuffersbd.com
-            npm install --production
-            mkdir -p tmp && touch tmp/restart.txt
+          protocol: ftp
+          port: 21
+          local-dir: server/tmp/
+          server-dir: /server.tuffersbd.com/tmp/
