@@ -12,11 +12,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repository
-      - name: Checkout Code
+      # 1️⃣ Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js with caching
+      # 2️⃣ Setup Node.js + caching
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -34,8 +34,13 @@ jobs:
             npm install
           fi
 
-      # 4️⃣ Upload server folder as artifact for debugging / future reuse
-      - name: Upload Server Artifact
+      # 4️⃣ Optional: List local files (debug)
+      - name: List server folder
+        run: |
+          ls -la server/
+
+      # 5️⃣ Upload server folder as artifact
+      - name: Upload server artifact
         uses: actions/upload-artifact@v4
         with:
           name: server-artifact
@@ -49,18 +54,29 @@ jobs:
             !server/.vscode/**
           retention-days: 7
 
-      # 5️⃣ Deploy server folder via FTP
-      - name: Deploy to cPanel via FTP
+      # 6️⃣ Ensure remote folder exists (avoid 553)
+      - name: Create remote folder via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SFTP_PASSWORD }}
+          port: 21098
+          script: |
+            mkdir -p ~/server.tuffersbd.com
+
+      # 7️⃣ Deploy server via FTP
+      - name: Deploy server to cPanel via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
-          server: ${{ secrets.SERVER_HOST }}           # ex: 198.187.29.8
-          username: ${{ secrets.SERVER_USER }}        # cPanel FTP username
-          password: ${{ secrets.SFTP_PASSWORD }}      # cPanel FTP password
-          protocol: ftps                               # SamKirkland action supports ftp / ftps / ftps-legacy
+          server: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SFTP_PASSWORD }}
+          protocol: ftp
           port: 21
-          local-dir: server/                           # local folder containing backend files
-          server-dir: server.tuffersbd.com/            # remote folder on cPanel
-          dangerous-clean-slate: true                 # optional: remove existing files first
+          local-dir: server/                        # local folder
+          server-dir: server.tuffersbd.com/         # remote folder
+          dangerous-clean-slate: true
           exclude: |
             **/.git*
             **/.DS_Store
@@ -72,14 +88,14 @@ jobs:
             server/.vscode/**
             server/*.md
 
-      # 6️⃣ Restart Node.js App on cPanel via SSH
-      - name: Restart Node.js App (SSH)
+      # 8️⃣ Restart Node.js App via SSH
+      - name: Restart Node.js App
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SFTP_PASSWORD }}
-          port: 21098                              # আপনার cPanel SSH port
+          port: 21098
           script: |
             cd ~/server.tuffersbd.com
             npm install --production
