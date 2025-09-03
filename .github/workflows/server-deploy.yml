@@ -5,68 +5,43 @@ on:
     branches: [ "main" ]
     paths:
       - "server/**"
-      - ".github/workflows/server-deploy.yml"
 
 jobs:
-  build-and-deploy:
+  deploy-server:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js + cache
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: npm
           cache-dependency-path: server/package-lock.json
 
-      # 3️⃣ Install dependencies
       - name: Install dependencies
         working-directory: server
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-      # 4️⃣ Upload server folder as artifact (for reuse/debug)
-      - name: Upload server artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: server-artifact
-          path: |
-            server/**
-            !server/node_modules/**
-            !server/test/**
-            !server/tests/**
-            !server/coverage/**
-            !server/.env.local
-            !server/.vscode/**
+          path: server/**
           retention-days: 3
 
-      # 5️⃣ Deploy server via FTPS
-      - name: Deploy to cPanel via FTPS
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      - name: Deploy via SFTP (auto-create folder)
+        uses: wlixcc/SFTP-Deploy-Action@v1.2
         with:
-          server: ${{ secrets.SFTP_HOST }}
-          username: ${{ secrets.SERVER_FTP_USER }}
+          host: ${{ secrets.SERVER_HOST }}
+          port: 21098
+          username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SFTP_PASSWORD }}
-          protocol: ftps
-          port: 21
-          local-dir: server/
-          server-dir: server.tuffersbd.com/
-          exclude: |
-            **/.git*
-            **/.DS_Store
-            server/node_modules/**
-            server/test/**
-            server/tests/**
-            server/coverage/**
-            server/.env.local
-            server/.vscode/**
-            server/*.md
+          local_path: server/*
+          remote_path: server.tuffersbd.com/
+          args: "-o StrictHostKeyChecking=no"
 
-      # 6️⃣ Restart Node.js App on cPanel via SSH
       - name: Restart Node.js App (SSH)
         uses: appleboy/ssh-action@v0.1.7
         with:
