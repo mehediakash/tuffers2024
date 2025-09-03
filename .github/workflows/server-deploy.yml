@@ -54,7 +54,7 @@ jobs:
           protocol: ftps
           port: 21
           local-dir: server/
-          dangerous-clean-slate: true
+          server-dir: server.tuffersbd.com/
           exclude: |
             **/.git*
             **/.DS_Store
