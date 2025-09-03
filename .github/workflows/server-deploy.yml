@@ -57,7 +57,7 @@ jobs:
           password: ${{ secrets.SFTP_PASSWORD }}
           protocol: ftp
           port: 21
-          local-dir: server/                       # adjust if you build into dist/
+          local-dir: server/                       
           server-dir: server.tuffersbd.com/
           dangerous-clean-slate: true
           exclude: |
