@@ -58,7 +58,7 @@ jobs:
           protocol: ftp
           port: 21
           local-dir: server/                       # adjust if you build into dist/
-          server-dir: /server.tuffersbd.com/
+          server-dir: server.tuffersbd.com/
           dangerous-clean-slate: true
           exclude: |
             **/.git*
