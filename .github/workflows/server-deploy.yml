@@ -34,8 +34,8 @@ jobs:
       - name: Deploy via SFTP (auto-create folder)
         uses: wlixcc/SFTP-Deploy-Action@v1.2
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          port: 21098
+          host: ${{ secrets.SFTP_HOST }}
+          port: 21
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SFTP_PASSWORD }}
           local_path: server/*
