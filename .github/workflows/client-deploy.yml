@@ -12,12 +12,6 @@ on:
 jobs:
   build-and-deploy-client:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
-    env:
-      REMOTE_PUBLIC_HTML: public_html/
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,7 +49,7 @@ jobs:
           password: ${{ secrets.SFTP_PASSWORD }}
           protocol: ftps
           port: 21
-          local-dir: client/dist
+          local-dir: client/dist/
           server-dir: public_html
         
           exclude: |
