@@ -58,8 +58,6 @@ jobs:
           protocol: ftps
           port: 21
           local-dir: server/                      
-          dangerous-clean-slate: true
-          passive: true
           debug: true
           exclude: |
             **/.git*
