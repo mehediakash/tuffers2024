@@ -30,8 +30,8 @@ const Subcategory = lazy(() => import("./components/shop/Subcategory"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const ShippingRates = lazy(() => import("./pages/ShippingRates"));
 const DeliveryInfo = lazy(() => import("./pages/DeliveryInfo"));
-const RefundsAndReplacements = lazy(() =>
-  import("./pages/RefundsAndReplacements")
+const RefundsAndReplacements = lazy(
+  () => import("./pages/RefundsAndReplacements"),
 );
 const MegaSale = lazy(() => import("./components/shop/MegaSale"));
 const LatestSale = lazy(() => import("./components/shop/LatestSale"));
@@ -52,7 +52,6 @@ const router = createBrowserRouter(
         }
       />
 
-      
       <Route
         path="shop"
         element={
@@ -118,10 +117,6 @@ const router = createBrowserRouter(
           }
         />
       </Route>
-
-
-
-
 
       <Route
         path="about"
@@ -227,8 +222,8 @@ const router = createBrowserRouter(
           </Suspense>
         }
       />
-    </Route>
-  )
+    </Route>,
+  ),
 );
 
 function App() {

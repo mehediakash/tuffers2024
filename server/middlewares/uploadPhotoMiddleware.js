@@ -3,6 +3,10 @@ const multer = require("multer");
 const sharp = require("sharp");
 const AppError = require("../utils/AppError");
 const catchAsync = require("../utils/catchAsync");
+const {
+  getCloudinaryFolder,
+  uploadBufferToCloudinary,
+} = require("../services/cloudinaryService");
 
 const multerStorage = multer.memoryStorage();
 
@@ -20,7 +24,7 @@ const uploadPhotoMiddleware = (multiple = false, maxFiles = 4) => {
   return multiple ? upload.array("photos", maxFiles) : upload.single("photo");
 };
 
-// IMAGE PROCESSING USING SHARP
+// IMAGE PROCESSING USING SHARP & DIRECT CLOUDINARY UPLOAD
 const resizePhotoMiddleware = (directory) => {
   return catchAsync(async (req, res, next) => {
     // Handle both single and multiple files
@@ -32,41 +36,52 @@ const resizePhotoMiddleware = (directory) => {
     const uniqueSuffix = () =>
       Date.now() + "-" + Math.round(Math.random() * 1e9);
 
-    const processImage = async (file) => {
-      // Get the original file extension
-      const originalExtension = path.extname(file.originalname);
+    const folder = getCloudinaryFolder(directory);
 
-      // Set file name with unique suffix and original extension
-      file.filename = `${directory}-${uniqueSuffix()}${originalExtension}`;
-
+    const processAndUploadImage = async (file) => {
       const dimensions = {
         product: { width: 900, height: 700, quality: 95 },
+        products: { width: 900, height: 700, quality: 95 },
         brand: { width: 450, height: 450, quality: 80 },
+        brands: { width: 450, height: 450, quality: 80 },
         reviews: { width: 400, height: 400, quality: 85 },
       }[directory] || { width: 500, height: 500, quality: 90 };
 
       try {
-        const transformer = sharp(file.buffer);
+        let bufferToUpload = file.buffer;
 
-        // Ignore resize() for Banner and Brand
-        if (directory !== "banner") {
-          transformer.resize(dimensions.width, dimensions.height);
+        // Resize with Sharp if not banner
+        if (directory !== "banner" && directory !== "banners") {
+          const transformer = sharp(file.buffer).resize(
+            dimensions.width,
+            dimensions.height
+          );
+          bufferToUpload = await transformer.toBuffer();
         }
 
-        transformer
-          .toFormat(originalExtension.slice(1)) // Set the format to the original extension
-          .toFile(`uploads/${directory}/${file.filename}`, {
-            quality: dimensions.quality,
-          });
+        const publicIdName = `${directory}-${uniqueSuffix()}`;
+        const result = await uploadBufferToCloudinary(bufferToUpload, {
+          folder,
+          public_id: publicIdName,
+        });
 
-        file.fileName = file.filename; // Save the filename for later use
+        // Attach Cloudinary details to the file object
+        file.secure_url = result.secure_url;
+        file.public_id = result.public_id;
+        file.url = result.secure_url;
+        file.filename = result.secure_url;
+        file.fileName = result.secure_url;
+        file.path = result.secure_url;
       } catch (err) {
-        return next(new AppError("Failed while processing the image", 500));
+        throw new AppError(
+          `Failed while uploading image to Cloudinary: ${err.message}`,
+          500
+        );
       }
     };
 
     // Process all files
-    await Promise.all(files.map(processImage));
+    await Promise.all(files.map(processAndUploadImage));
 
     next();
   });

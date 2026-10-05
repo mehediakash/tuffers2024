@@ -19,6 +19,13 @@ const productSchema = new Schema(
       },
     ],
 
+    photoPublicIds: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+
     description: {
       type: String,
       required: [true, "Product description is required"],

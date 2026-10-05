@@ -1,4 +1,3 @@
-const path = require("path");
 const Category = require("../models/categoryModel");
 const SubCategory = require("../models/subCategoryModel");
 const Brand = require("../models/brandModel");
@@ -8,8 +7,11 @@ const Variant = require("../models/variantModel");
 const APIFeatures = require("../utils/APIFeatures");
 const AppError = require("../utils/AppError");
 const catchAsync = require("../utils/catchAsync");
-const deleteFile = require("../utils/deleteFile");
 const { getAll, getOne, updateOne } = require("../utils/handleFactory");
+const {
+  deleteFromCloudinary,
+  deleteImageSafe,
+} = require("../services/cloudinaryService");
 
 exports.createSubCategoryController = catchAsync(async (req, res, next) => {
   const subCategory = await SubCategory.create(req.body);
@@ -61,22 +63,10 @@ exports.deleteSubCategoryController = catchAsync(async (req, res, next) => {
 
   for (const brand of brands) {
     // Delete brand photo if it exists
-    if (brand.photo) {
-      const photoName = brand.photo.split("/").pop();
-      const photoPath = path.join(
-        __dirname,
-        "..",
-        "uploads",
-        "brand",
-        photoName
-      );
-
-      try {
-        await deleteFile(photoPath);
-      } catch (err) {
-        console.log(`Failed to delete brand photo: ${err.message}`);
-        // Continue with the deletion process even if the photo deletion fails
-      }
+    if (brand.photoPublicId) {
+      await deleteFromCloudinary(brand.photoPublicId);
+    } else if (brand.photo) {
+      await deleteImageSafe(brand.photo, "brand");
     }
 
     // Find all products associated with this brand
@@ -85,21 +75,13 @@ exports.deleteSubCategoryController = catchAsync(async (req, res, next) => {
     for (const product of products) {
       // Delete product photos if they exist
       if (product.photos && product.photos.length > 0) {
-        for (const photoPath of product.photos) {
-          const photoName = photoPath.split("/").pop();
-          const productPhotoPath = path.join(
-            __dirname,
-            "..",
-            "uploads",
-            "products",
-            photoName
-          );
-
-          try {
-            await deleteFile(productPhotoPath);
-          } catch (err) {
-            console.log(`Failed to delete product photo: ${err.message}`);
-            // Continue with the deletion process even if the photo deletion fails
+        for (let i = 0; i < product.photos.length; i++) {
+          const photoUrl = product.photos[i];
+          const publicId = product.photoPublicIds && product.photoPublicIds[i];
+          if (publicId) {
+            await deleteFromCloudinary(publicId);
+          } else {
+            await deleteImageSafe(photoUrl, "products");
           }
         }
       }

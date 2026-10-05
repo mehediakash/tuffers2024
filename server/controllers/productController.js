@@ -1,4 +1,3 @@
-const fs = require("fs");
 const Brand = require("../models/brandModel");
 const Product = require("../models/productModel");
 const Variant = require("../models/variantModel");
@@ -6,22 +5,21 @@ const Option = require("../models/optionModel");
 const APIFeatures = require("../utils/APIFeatures");
 const AppError = require("../utils/AppError");
 const catchAsync = require("../utils/catchAsync");
-const deleteFile = require("../utils/deleteFile");
 const { getAll, getOne } = require("../utils/handleFactory");
+const {
+  deleteFromCloudinary,
+  deleteImageSafe,
+} = require("../services/cloudinaryService");
 
 exports.createProductController = catchAsync(async (req, res, next) => {
   const body = req.body;
 
   if (req.files && req.files.length > 0) {
-    body.photos = req.files.map((file) => {
-      return `${req.protocol}://${req.get("host")}/uploads/products/${
-        file.filename
-      }`;
-    });
+    body.photos = req.files.map((file) => file.secure_url);
+    body.photoPublicIds = req.files.map((file) => file.public_id);
   } else {
     delete body.photos;
   }
-
 
   // Add YouTube video URL to the photos array
   if (body.videoUrl && body.videoUrl) {
@@ -55,6 +53,14 @@ exports.createProductController = catchAsync(async (req, res, next) => {
       },
     });
   } catch (error) {
+    if (req.files && req.files.length > 0) {
+      await Promise.all(
+        req.files
+          .filter((file) => file.public_id)
+          .map((file) => deleteFromCloudinary(file.public_id))
+      );
+    }
+
     if (error.errors) {
       const messages = Object.values(error.errors)
         .map((item) => item.properties.message)
@@ -70,19 +76,8 @@ exports.createProductController = catchAsync(async (req, res, next) => {
       return next(new AppError(message, 409));
     }
 
-    if (req.files && req.files.length > 0) {
-      req.files.forEach((file) => {
-        const filePath = `uploads/products/${file.fileName}`;
-        fs.unlink(filePath, (err) => {
-          if (err) {
-            return next(new AppError(`Error removing file: ${filePath}`, 500));
-          }
-        });
-      });
-    }
-
     return next(
-      new AppError(`Something went wrong while creating varient`, 400)
+      new AppError(`Something went wrong while creating product`, 400)
     );
   }
 });
@@ -120,27 +115,15 @@ exports.updateProductController = catchAsync(async (req, res, next) => {
   }
 
   const body = req.body;
+  const oldPhotos = [...(product.photos || [])];
+  const oldPublicIds = [...(product.photoPublicIds || [])];
 
+  let hasNewPhotos = false;
   // Handle photo uploads if present
   if (req.files && req.files.length > 0) {
-    // Remove old photos from file system
-    if (product.photos && product.photos.length > 0) {
-      for (const photoPath of product.photos) {
-        const photoName = photoPath.split("/").pop();
-        const path = `uploads/products/${photoName}`;
-        try {
-          await deleteFile(path);
-        } catch (err) {
-          console.error(`Failed to delete file: ${err.message}`);
-        }
-      }
-    }
-
-    // Update photos
-    body.photos = req.files.map(
-      (file) =>
-        `${req.protocol}://${req.get("host")}/uploads/products/${file.filename}`
-    );
+    hasNewPhotos = true;
+    body.photos = req.files.map((file) => file.secure_url);
+    body.photoPublicIds = req.files.map((file) => file.public_id);
   }
 
   const isValidYouTubeUrl = (url) => {
@@ -167,13 +150,25 @@ exports.updateProductController = catchAsync(async (req, res, next) => {
     }
   }
 
-
   // Update only the fields that are present in the request body
   Object.keys(body).forEach((key) => {
     product[key] = body[key];
   });
 
   await product.save();
+
+  // If new photos were uploaded and DB update succeeded, delete old photos
+  if (hasNewPhotos && oldPhotos.length > 0) {
+    for (let i = 0; i < oldPhotos.length; i++) {
+      const oldUrl = oldPhotos[i];
+      const oldPubId = oldPublicIds[i];
+      if (oldPubId) {
+        await deleteFromCloudinary(oldPubId);
+      } else {
+        await deleteImageSafe(oldUrl, "products");
+      }
+    }
+  }
 
   res.status(200).json({
     status: "success",
@@ -190,17 +185,15 @@ exports.deleteProductController = catchAsync(async (req, res, next) => {
     return next(new AppError("No product was found with that ID!", 404));
   }
 
-  // Remove product photos from file system
+  // Remove product photos
   if (product.photos && product.photos.length > 0) {
-    for (const photoPath of product.photos) {
-      const photoName = photoPath.split("/").pop();
-      const path = `uploads/products/${photoName}`;
-
-      try {
-        await deleteFile(path);
-      } catch (err) {
-        console.error(`Failed to delete file: ${err.message}`);
-        // Continue with the deletion process even if the file deletion fails
+    for (let i = 0; i < product.photos.length; i++) {
+      const photoUrl = product.photos[i];
+      const publicId = product.photoPublicIds && product.photoPublicIds[i];
+      if (publicId) {
+        await deleteFromCloudinary(publicId);
+      } else {
+        await deleteImageSafe(photoUrl, "products");
       }
     }
   }

@@ -17,6 +17,11 @@ const brandSchema = new Schema(
       trim: true,
     },
 
+    photoPublicId: {
+      type: String,
+      trim: true,
+    },
+
     isActive: {
       type: Boolean,
       default: true,

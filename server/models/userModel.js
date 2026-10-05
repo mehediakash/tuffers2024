@@ -25,6 +25,11 @@ const userSchema = new Schema(
       trim: true,
     },
 
+    photoPublicId: {
+      type: String,
+      trim: true,
+    },
+
     phone: {
       type: String,
       required: [true, "Phone number is required"],

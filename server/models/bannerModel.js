@@ -19,6 +19,11 @@ const bannerSchema = new Schema(
       required: [true, "Photo is required"],
     },
 
+    photoPublicId: {
+      type: String,
+      trim: true,
+    },
+
     link: {
       type: String,
       required: [true, "Link is required"],

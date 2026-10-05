@@ -10,10 +10,7 @@ process.on("uncaughtException", (err) => {
 
 const app = require("./app");
 
-const DB = process.env.DATABASE.replace(
-  "<PASSWORD>",
-  process.env.DATABASE_PASSWORD
-);
+const DB = process.env.DATABASE;
 
 mongoose
   .connect(DB)
@@ -22,7 +19,7 @@ mongoose
 
 const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, () =>
-  console.log(`SERVER IS RUNNING ON PORT ${PORT}`)
+  console.log(`SERVER IS RUNNING ON PORT ${PORT}`),
 );
 
 // UNHANDLED PROMISE REJECTION CATCHER (GLOBALLY):

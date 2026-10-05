@@ -1,5 +1,3 @@
-const fs = require("fs").promises;
-const path = require("path");
 const SubCategory = require("../models/subCategoryModel");
 const Brand = require("../models/brandModel");
 const Product = require("../models/productModel");
@@ -8,16 +6,18 @@ const Option = require("../models/optionModel");
 const APIFeatures = require("../utils/APIFeatures");
 const AppError = require("../utils/AppError");
 const catchAsync = require("../utils/catchAsync");
-const deleteFile = require("../utils/deleteFile");
 const { getOne, getAll } = require("../utils/handleFactory");
+const {
+  deleteFromCloudinary,
+  deleteImageSafe,
+} = require("../services/cloudinaryService");
 
 exports.createBrandController = catchAsync(async (req, res, next) => {
   const body = req.body;
 
   if (req.file) {
-    body.photo = `${req.protocol}://${req.get("host")}/uploads/brand/${
-      req.file.filename
-    }`;
+    body.photo = req.file.secure_url;
+    body.photoPublicId = req.file.public_id;
   } else {
     delete body.photo;
   }
@@ -43,15 +43,12 @@ exports.createBrandController = catchAsync(async (req, res, next) => {
       },
     });
   } catch (error) {
-    if (req.file) {
-      const filePath = `uploads/brand/${req.file.filename}`;
-      fs.unlink(filePath, (err) => {
-        if (err) {
-          return next(
-            new AppError("Something went wrong while creating the brand", 500)
-          );
-        }
-      });
+    if (req.file && req.file.public_id) {
+      try {
+        await deleteFromCloudinary(req.file.public_id);
+      } catch (cleanupErr) {
+        console.error("Failed to delete Cloudinary image on brand create error:", cleanupErr.message);
+      }
     }
 
     if (error.errors) {
@@ -81,17 +78,12 @@ exports.updateBrandController = catchAsync(async (req, res, next) => {
   }
 
   const body = req.body;
-
-  let oldPhotoLink = null;
-  if (brand.photo) {
-    const photoName = brand.photo.split("/");
-    oldPhotoLink = `uploads/brand/${photoName[photoName.length - 1]}`;
-  }
+  const oldPhoto = brand.photo;
+  const oldPhotoPublicId = brand.photoPublicId;
 
   if (req.file) {
-    body.photo = `${req.protocol}://${req.get("host")}/uploads/brand/${
-      req.file.filename
-    }`;
+    body.photo = req.file.secure_url;
+    body.photoPublicId = req.file.public_id;
   } else {
     delete body.photo;
   }
@@ -102,13 +94,13 @@ exports.updateBrandController = catchAsync(async (req, res, next) => {
 
   await brand.save();
 
-  // Delete old photo if a new one was uploaded and an old photo exists
-  if (req.file && oldPhotoLink) {
-    fs.unlink(oldPhotoLink, (err) => {
-      if (err) {
-        console.error("Failed to delete old photo:", err);
-      }
-    });
+  // Delete old photo only after new one is successfully uploaded and saved
+  if (req.file && (oldPhotoPublicId || oldPhoto)) {
+    if (oldPhotoPublicId) {
+      await deleteFromCloudinary(oldPhotoPublicId);
+    } else {
+      await deleteImageSafe(oldPhoto, "brand");
+    }
   }
 
   res.status(200).json({
@@ -131,17 +123,10 @@ exports.deleteBrandController = catchAsync(async (req, res, next) => {
   }
 
   // Delete brand photo if it exists
-  if (brand.photo) {
-    const photoName = brand.photo.split("/").pop();
-    const photoPath = path.join(__dirname, "..", "uploads", "brand", photoName);
-
-    try {
-      await fs.access(photoPath); // Check if the file exists
-      await deleteFile(photoPath);
-    } catch (err) {
-      console.error(`Failed to delete file: ${err.message}`);
-      // Continue with the brand deletion even if the file deletion fails
-    }
+  if (brand.photoPublicId) {
+    await deleteFromCloudinary(brand.photoPublicId);
+  } else if (brand.photo) {
+    await deleteImageSafe(brand.photo, "brand");
   }
 
   // Find all products associated with this brand
@@ -150,22 +135,13 @@ exports.deleteBrandController = catchAsync(async (req, res, next) => {
   for (const product of products) {
     // Delete product photos if they exist
     if (product.photos && product.photos.length > 0) {
-      for (const photoPath of product.photos) {
-        const photoName = photoPath.split("/").pop();
-        const productPhotoPath = path.join(
-          __dirname,
-          "..",
-          "uploads",
-          "products",
-          photoName
-        );
-
-        try {
-          await fs.access(productPhotoPath); // Check if the file exists
-          await deleteFile(productPhotoPath);
-        } catch (err) {
-          console.error(`Failed to delete file: ${err.message}`);
-          // Continue with the product deletion even if the file deletion fails
+      for (let i = 0; i < product.photos.length; i++) {
+        const photoUrl = product.photos[i];
+        const publicId = product.photoPublicIds && product.photoPublicIds[i];
+        if (publicId) {
+          await deleteFromCloudinary(publicId);
+        } else {
+          await deleteImageSafe(photoUrl, "products");
         }
       }
     }
