@@ -15,6 +15,7 @@ import {
   EditOutlined,
   DeleteOutlined,
   PlusOutlined,
+  LoadingOutlined,
 } from "@ant-design/icons";
 import axios from "../Components/Axios";
 
@@ -113,7 +114,7 @@ const AddBrand = () => {
       form.resetFields();
     } catch (error) {
       message.error(
-        isEditMode ? "Failed to update brand." : "Failed to add brand."
+        isEditMode ? "Failed to update brand." : "Failed to add brand.",
       );
     } finally {
       setLoading(false);
@@ -172,6 +173,14 @@ const AddBrand = () => {
 
   return (
     <div>
+      {loading && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40">
+          <div className="rounded-md bg-white px-8 py-6 text-center shadow-xl">
+            <LoadingOutlined className="text-3xl text-primary" />
+            <p className="mt-3">Uploading, please wait...</p>
+          </div>
+        </div>
+      )}
       <div className="flex justify-between mt-5">
         <h2 className="text-2xl font-medium">Manage Brands</h2>
         <Button

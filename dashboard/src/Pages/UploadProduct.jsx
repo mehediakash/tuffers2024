@@ -123,13 +123,11 @@ const UploadProduct = () => {
       return;
     }
 
-    if(values.videoUrl){
-      formData.append("videoUrl", values.videoUrl);
-    }
-
     const formData = new FormData();
     formData.append("name", values.name);
-    
+    if (values.videoUrl) {
+      formData.append("videoUrl", values.videoUrl);
+    }
 
     formData.append("category", values.category);
     formData.append("subCategory", values.subCategory);
@@ -236,6 +234,7 @@ const UploadProduct = () => {
     formData.append("subCategory", values.subCategory);
     formData.append("photo", brandFileList[0]);
 
+    setLoading(true);
     try {
       await axios.post("/brand", formData, {
         headers: {
@@ -249,11 +248,21 @@ const UploadProduct = () => {
       fetchBrands(); // Refresh the brand list
     } catch (error) {
       message.error("Failed to create brand");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <>
+      {loading && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40">
+          <div className="rounded-md bg-white px-8 py-6 text-center shadow-xl">
+            <LoadingOutlined className="text-3xl text-primary" />
+            <p className="mt-3">Uploading, please wait...</p>
+          </div>
+        </div>
+      )}
       <h2 className="text-center font-semibold md:text-2xl text-xl py-10 uppercase underline">
         Upload Products
       </h2>
@@ -271,7 +280,7 @@ const UploadProduct = () => {
               },
             ]}
           >
-            <Input/>
+            <Input />
           </Form.Item>
 
           <Form.Item label="Product Description" name="description">
@@ -282,40 +291,43 @@ const UploadProduct = () => {
           </Form.Item>
 
           <Form.Item
-  className="mt-14"
-  label="Select Category"
-  name="category"
-  rules={[{ required: true, message: "Please select a category!" }]}
->
-  <Select
-    style={{ width: "100%" }}
-    options={categories.map((category) => ({
-      label: category.title,
-      value: category._id,
-    }))}
-    onChange={(value) => {
-      setSelectedCategoryId(value);
-      productForm.setFieldsValue({ subCategory: undefined }); // reset subCategory when category changes
-    }}
-  />
-</Form.Item>
+            className="mt-14"
+            label="Select Category"
+            name="category"
+            rules={[{ required: true, message: "Please select a category!" }]}
+          >
+            <Select
+              style={{ width: "100%" }}
+              options={categories.map((category) => ({
+                label: category.title,
+                value: category._id,
+              }))}
+              onChange={(value) => {
+                setSelectedCategoryId(value);
+                productForm.setFieldsValue({ subCategory: undefined }); // reset subCategory when category changes
+              }}
+            />
+          </Form.Item>
 
-<Form.Item
-  label="Sub Category"
-  name="subCategory"
-  rules={[
-    { required: true, message: "Please select a sub-category!" },
-  ]}
->
-  <Select
-    style={{ width: "100%" }}
-    options={subCategories?.filter((subCategory) => subCategory?.category === selectedCategoryId)
-      .map((subCategory) => ({
-        label: subCategory?.title,
-        value: subCategory?._id,
-      }))}
-  />
-</Form.Item>
+          <Form.Item
+            label="Sub Category"
+            name="subCategory"
+            rules={[
+              { required: true, message: "Please select a sub-category!" },
+            ]}
+          >
+            <Select
+              style={{ width: "100%" }}
+              options={subCategories
+                ?.filter(
+                  (subCategory) => subCategory?.category === selectedCategoryId,
+                )
+                .map((subCategory) => ({
+                  label: subCategory?.title,
+                  value: subCategory?._id,
+                }))}
+            />
+          </Form.Item>
 
           <Form.Item
             label="Brand"

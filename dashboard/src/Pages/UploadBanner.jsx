@@ -13,12 +13,13 @@ import {
 } from "antd";
 import React, { useState, useEffect } from "react";
 import axios from "../Components/Axios";
-import { UploadOutlined } from "@ant-design/icons";
+import { LoadingOutlined, UploadOutlined } from "@ant-design/icons";
 
 const UploadBanner = () => {
   const [brandForm] = Form.useForm();
   const [banners, setBanners] = useState([]);
   const [fileList, setFileList] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const fetchBanners = async () => {
     try {
@@ -35,6 +36,7 @@ const UploadBanner = () => {
   }, []);
 
   const handleBrandSubmit = async (values) => {
+    setLoading(true);
     try {
       const formData = new FormData();
       formData.append("title", values.title);
@@ -58,6 +60,8 @@ const UploadBanner = () => {
     } catch (error) {
       message.error("Failed to add banner");
       console.error("Error adding banner:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -131,6 +135,14 @@ const UploadBanner = () => {
 
   return (
     <>
+      {loading && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40">
+          <div className="rounded-md bg-white px-8 py-6 text-center shadow-xl">
+            <LoadingOutlined className="text-3xl text-primary" />
+            <p className="mt-3">Uploading, please wait...</p>
+          </div>
+        </div>
+      )}
       <h2 className="text-center font-semibold md:text-2xl text-xl py-10 ">
         Add Banner
       </h2>
@@ -200,8 +212,8 @@ const UploadBanner = () => {
                 </Upload>
               </Form.Item>
               <br />
-              <Button type="primary" htmlType="submit">
-                Add Banner
+              <Button type="primary" htmlType="submit" disabled={loading}>
+                {loading ? <LoadingOutlined /> : "Add Banner"}
               </Button>
             </Form>
           </Card>
