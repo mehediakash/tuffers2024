@@ -1,6 +1,5 @@
 const crypto = require("crypto");
 const validator = require("validator");
-const bcrypt = require("bcrypt");
 const mongoose = require("mongoose");
 const { Schema, model } = mongoose;
 
@@ -94,15 +93,12 @@ const userSchema = new Schema(
 
   {
     timestamps: true,
-  }
+  },
 );
 
 // DOCUMENT MIDDLEWARES:
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
-
-  this.password = await bcrypt.hash(this.password, 10);
-  this.confirmPassword = undefined;
+userSchema.pre("save", function (next) {
+  if (this.isModified("confirmPassword")) this.confirmPassword = undefined;
   next();
 });
 
@@ -123,16 +119,16 @@ userSchema.pre(/^find/, function (next) {
 // INSTANCE METHODS:
 userSchema.methods.correctPassword = async function (
   candidatePassword,
-  userPassword
+  userPassword,
 ) {
-  return await bcrypt.compare(candidatePassword, userPassword);
+  return candidatePassword === userPassword;
 };
 
 userSchema.methods.changedPasswordAfter = function (JWTIssuedTime) {
   if (this.passwordChangedAt) {
     const passwordChangeTime = parseInt(
       this.passwordChangedAt.getTime() / 1000,
-      10
+      10,
     );
 
     return JWTIssuedTime < passwordChangeTime; // Example: (100 < 200) --> True --> Password has Changed after the Token was provided
